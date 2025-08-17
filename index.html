@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>جارٍ التحميل... - Giedo digital marketing</title>
+  <meta name="description" content="Giedo digital marketing - موقع ديناميكي قابل للتحكم عبر لوحة إدارة." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{font-family:"Noto Kufi Arabic",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}</style>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="site" class="max-w-6xl mx-auto px-6 py-8">
+    <div id="loading" class="text-center py-20">جاري تحميل المحتوى... إذا استمر التحميل، تأكد من إعداد Firebase بشكل صحيح.</div>
+  </div>
+
+  <script>
+    // Initialize Firebase
+    if (!window.firebaseConfig) {
+      document.getElementById('loading').innerText = 'خطأ: ملف firebase-config.js غير مُعد. اقرأ README.';
+      throw new Error('missing firebaseConfig');
+    }
+    firebase.initializeApp(window.firebaseConfig);
+    const db = firebase.firestore();
+
+    async function renderSite() {
+      try {
+        const doc = await db.collection('site').doc('content').get();
+        if (!doc.exists) {
+          document.getElementById('loading').innerText = 'لم يتم العثور على محتوى الموقع. افتح لوحة التحكم لإنشاء المحتوى.';
+          return;
+        }
+        const data = doc.data();
+
+        document.title = data.title || 'Giedo digital marketing';
+
+        const phone = data.phone || '';
+        const whatsapp = data.whatsapp || '';
+        const email = data.email || '';
+
+        // Build minimal UI dynamically using data
+        const html = `
+<header class="bg-white shadow mb-6">
+  <div class="flex items-center justify-between py-4">
+    <div class="flex items-center gap-4">
+      <div class="w-12 h-12 bg-blue-600 text-white rounded flex items-center justify-center text-xl font-bold">${(data.brandInitial||'G')}</div>
+      <div>
+        <h1 class="text-lg font-semibold">${data.title}</h1>
+        <p class="text-sm text-gray-500">${data.tagline || 'دعاية وإعلان — تسويق رقمي — متاجر إلكترونية'}</p>
+      </div>
+    </div>
+    <div class="text-sm">
+      <div>الهاتف: <a href="tel:${phone.replace(/\s+/g,'')}" class="text-blue-600">${phone}</a></div>
+      <div>واتساب: <a href="https://wa.me/${whatsapp}" target="_blank" class="text-green-600">فتح محادثة WhatsApp</a></div>
+      <div>البريد: <a href="mailto:${email}" class="text-blue-600">${email}</a></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="mb-8">
+    <h2 class="text-3xl font-extrabold mb-2">${data.heroTitle || 'نرفع مبيعاتك بحملات إعلانية احترافية'}</h2>
+    <p class="text-gray-600">${data.heroSubtitle || 'نساعدك على بيع منتجاتك وإدارة حملاتك محليا ودوليا.'}</p>
+  </section>
+
+  <section id="packages" class="mb-8">
+    <h3 class="text-2xl font-semibold mb-4">الباقات</h3>
+    <div class="grid md:grid-cols-3 gap-4">
+      ${(data.packages || []).map(pkg => `
+        <div class="bg-white p-4 rounded shadow">
+          <div class="flex items-center justify-between">
+            <h4 class="font-semibold">${pkg.title}</h4>
+            ${pkg.badge? `<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">${pkg.badge}</span>`: ''}
+          </div>
+          <p class="text-sm text-gray-600 mt-2">${pkg.desc}</p>
+          <div class="mt-3 flex items-center justify-between">
+            <div class="font-bold">${pkg.price || ''}</div>
+            <a href="#contact" class="bg-blue-600 text-white px-3 py-1 rounded">اطلب الآن</a>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </section>
+
+  <section id="global" class="mb-8">
+    <h3 class="text-2xl font-semibold mb-4">الباقة العالمية</h3>
+    <div class="bg-white p-4 rounded shadow">
+      <p class="text-gray-600">${data.globalPackageDesc || 'نروج ونبيع منتجاتك ماديًا ورقميًا وإلكترونيًا على منصات عالمية.'}</p>
+      <div class="mt-3 text-sm text-gray-700">سعر: ${data.globalPackagePrice || 'حسب المشروع — تواصل معنا'}</div>
+    </div>
+  </section>
+
+  <section id="shop" class="mb-8">
+    <h3 class="text-2xl font-semibold mb-4">منتجات</h3>
+    <div class="grid md:grid-cols-3 gap-4">
+      ${(data.products || []).map(p => `
+        <div class="bg-white p-4 rounded shadow">
+          <img src="${p.image || 'https://via.placeholder.com/400x220'}" alt="${p.title}" class="w-full rounded mb-3"/>
+          <h4 class="font-semibold">${p.title}</h4>
+          <p class="text-sm text-gray-600">${p.desc}</p>
+          <div class="mt-3 flex items-center justify-between">
+            <div class="font-bold">${p.price || ''}</div>
+            <a href="${p.buyLink || '#'}" class="bg-green-600 text-white px-3 py-1 rounded text-sm" target="_blank">اشترِ الآن</a>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </section>
+
+  <section id="contact" class="mb-12">
+    <h3 class="text-2xl font-semibold mb-4">تواصل معنا</h3>
+    <div class="bg-white p-4 rounded shadow">
+      <p class="text-gray-600">الهاتف: <a href="tel:${phone.replace(/\s+/g,'')}" class="text-blue-600">${phone}</a></p>
+      <p class="text-gray-600">واتساب: <a href="https://wa.me/${whatsapp}" target="_blank" class="text-green-600">فتح محادثة WhatsApp</a></p>
+      <p class="text-gray-600">البريد: <a href="mailto:${email}" class="text-blue-600">${email}</a></p>
+    </div>
+  </section>
+</main>
+
+<footer class="text-sm text-center text-gray-500 py-6">© ${new Date().getFullYear()} ${data.title || 'Giedo digital marketing'} — جميع الحقوق محفوظة.</footer>
+        `;
+
+        document.getElementById('site').innerHTML = html;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('loading').innerText = 'خطأ عند تحميل المحتوى. افتح لوحة التحكم لتأكيد الإعدادات.';
+      }
+    }
+
+    renderSite();
+  </script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>لوحة تحكم الموقع — Giedo digital marketing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{font-family:"Noto Kufi Arabic",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}</style>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-2xl font-bold mb-4">لوحة تحكم الموقع</h1>
+
+    <div id="auth-area" class="bg-white p-4 rounded shadow">
+      <div id="signed-out">
+        <p class="mb-2"> سجّل دخولك للوصول إلى أدوات التعديل.</p>
+        <input id="email" placeholder="البريد الإلكتروني" class="w-full border rounded px-3 py-2 mb-2" />
+        <input id="password" type="password" placeholder="كلمة المرور" class="w-full border rounded px-3 py-2 mb-2" />
+        <div class="flex gap-2">
+          <button id="btn-signin" class="bg-blue-600 text-white px-4 py-2 rounded">تسجيل الدخول</button>
+          <button id="btn-signup" class="bg-gray-200 px-4 py-2 rounded">إنشاء حساب (اختياري)</button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">يفضل إنشاء حساب مسؤول عبر وحدة تحكم Firebase ثم تعطيل التسجيل العام.</p>
+      </div>
+
+      <div id="signed-in" style="display:none">
+        <div class="flex items-center justify-between">
+          <div>مسجل باسم: <span id="user-email" class="font-semibold"></span></div>
+          <div>
+            <button id="btn-signout" class="bg-red-500 text-white px-3 py-1 rounded">تسجيل الخروج</button>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <form id="site-form" class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium">اسم الموقع</label>
+            <input id="f-title" class="w-full border rounded px-3 py-2" />
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-sm font-medium">الهاتف</label>
+              <input id="f-phone" class="w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium">واتساب (بدون +)</label>
+              <input id="f-whatsapp" class="w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium">البريد الإلكتروني</label>
+              <input id="f-email" class="w-full border rounded px-3 py-2" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium">عنوان البطل (Hero Title)</label>
+            <input id="f-heroTitle" class="w-full border rounded px-3 py-2" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium">وصف الباقة العالمية</label>
+            <textarea id="f-globalDesc" class="w-full border rounded px-3 py-2" rows="3"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium">سعر الباقة العالمية (نص)</label>
+            <input id="f-globalPrice" class="w-full border rounded px-3 py-2" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium">الباقات (JSON مصفوفة)</label>
+            <textarea id="f-packages" class="w-full border rounded px-3 py-2" rows="6"></textarea>
+            <p class="text-xs text-gray-500 mt-1">مثال: [{"title":"باقة البداية","desc":"...","price":"2000 ج.م","badge":"خصم 10%"}]</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium">المنتجات (JSON مصفوفة)</label>
+            <textarea id="f-products" class="w-full border rounded px-3 py-2" rows="6"></textarea>
+            <p class="text-xs text-gray-500 mt-1">مثال: [{"title":"قالب إعلان","desc":"...","price":"150 ج.م","image":"https://...","buyLink":"https://..."}]</p>
+          </div>
+
+          <div class="flex gap-2">
+            <button id="btn-save" type="button" class="bg-green-600 text-white px-4 py-2 rounded">حفظ التغييرات</button>
+            <button id="btn-refresh" type="button" class="bg-gray-200 px-4 py-2 rounded">تحميل القيم من الخادم</button>
+          </div>
+
+          <div id="status" class="text-sm text-gray-600 mt-2"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (!window.firebaseConfig) {
+      alert('خطأ: ملف firebase-config.js غير مُعد. راجع README.');
+      throw new Error('missing firebaseConfig');
+    }
+    firebase.initializeApp(window.firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    const signedOutEl = document.getElementById('signed-out');
+    const signedInEl = document.getElementById('signed-in');
+    const userEmailEl = document.getElementById('user-email');
+    const statusEl = document.getElementById('status');
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        signedOutEl.style.display = 'none';
+        signedInEl.style.display = 'block';
+        userEmailEl.innerText = user.email;
+        loadContent();
+      } else {
+        signedOutEl.style.display = 'block';
+        signedInEl.style.display = 'none';
+      }
+    });
+
+    document.getElementById('btn-signin').onclick = async () => {
+      const e = document.getElementById('email').value;
+      const p = document.getElementById('password').value;
+      try {
+        await auth.signInWithEmailAndPassword(e, p);
+      } catch (err) {
+        alert('خطأ عند تسجيل الدخول: ' + err.message);
+      }
+    };
+
+    document.getElementById('btn-signup').onclick = async () => {
+      const e = document.getElementById('email').value;
+      const p = document.getElementById('password').value;
+      try {
+        await auth.createUserWithEmailAndPassword(e, p);
+        alert('حساب تم إنشاؤه. يُنصح بتقييد التسجيل في Firebase Console لاحقًا.');
+      } catch (err) {
+        alert('خطأ عند إنشاء الحساب: ' + err.message);
+      }
+    };
+
+    document.getElementById('btn-signout').onclick = () => auth.signOut();
+
+    async function loadContent() {
+      statusEl.innerText = 'جاري تحميل المحتوى...';
+      try {
+        const doc = await db.collection('site').doc('content').get();
+        if (!doc.exists) {
+          // تعيين قيم افتراضية
+          document.getElementById('f-title').value = 'Giedo digital marketing';
+          document.getElementById('f-phone').value = '+20 128 242 9011';
+          document.getElementById('f-whatsapp').value = '201282429011';
+          document.getElementById('f-email').value = 'giedoshop@gmail.com';
+          document.getElementById('f-heroTitle').value = 'نرفع مبيعاتك بحملات إعلانية احترافية';
+          document.getElementById('f-globalDesc').value = 'الباقة العالمية...';
+          document.getElementById('f-globalPrice').value = 'اتصال لتسعير';
+          document.getElementById('f-packages').value = JSON.stringify([], null, 2);
+          document.getElementById('f-products').value = JSON.stringify([], null, 2);
+          statusEl.innerText = 'لا يوجد محتوى، تم تحميل قيم افتراضية.';
+          return;
+        }
+        const data = doc.data();
+        document.getElementById('f-title').value = data.title || '';
+        document.getElementById('f-phone').value = data.phone || '';
+        document.getElementById('f-whatsapp').value = data.whatsapp || '';
+        document.getElementById('f-email').value = data.email || '';
+        document.getElementById('f-heroTitle').value = data.heroTitle || '';
+        document.getElementById('f-globalDesc').value = data.globalPackageDesc || '';
+        document.getElementById('f-globalPrice').value = data.globalPackagePrice || '';
+        document.getElementById('f-packages').value = JSON.stringify(data.packages || [], null, 2);
+        document.getElementById('f-products').value = JSON.stringify(data.products || [], null, 2);
+        statusEl.innerText = 'تم التحميل.';
+      } catch (err) {
+        console.error(err);
+        statusEl.innerText = 'خطأ أثناء تحميل المحتوى: ' + err.message;
+      }
+    }
+
+    document.getElementById('btn-refresh').onclick = loadContent;
+
+    document.getElementById('btn-save').onclick = async () => {
+      statusEl.innerText = 'جارٍ الحفظ...';
+      try {
+        const content = {
+          title: document.getElementById('f-title').value,
+          phone: document.getElementById('f-phone').value,
+          whatsapp: document.getElementById('f-whatsapp').value,
+          email: document.getElementById('f-email').value,
+          heroTitle: document.getElementById('f-heroTitle').value,
+          globalPackageDesc: document.getElementById('f-globalDesc').value,
+          globalPackagePrice: document.getElementById('f-globalPrice').value,
+          packages: JSON.parse(document.getElementById('f-packages').value || '[]'),
+          products: JSON.parse(document.getElementById('f-products').value || '[]'),
+          brandInitial: (document.getElementById('f-title').value || 'G').trim().charAt(0).toUpperCase()
+        };
+        await db.collection('site').doc('content').set(content, { merge: true });
+        statusEl.innerText = 'تم حفظ المحتوى بنجاح.';
+      } catch (err) {
+        console.error(err);
+        statusEl.innerText = 'خطأ عند الحفظ: ' + err.message;
+      }
+    };
+  </script>
+</body>
+</html>
